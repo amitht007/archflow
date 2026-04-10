@@ -1,0 +1,1829 @@
+{
+  "types": {
+    "t_uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "t_timestamp": {
+      "type": "string",
+      "format": "datetime-iso8601"
+    },
+    "t_error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "traceId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "t_pagination": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "integer",
+          "min": 1
+        },
+        "pageSize": {
+          "type": "integer",
+          "min": 1,
+          "max": 100
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "t_user": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "$ref": "#/types/t_uuid"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "role": {
+          "type": "enum",
+          "values": [
+            "admin",
+            "user",
+            "guest"
+          ]
+        },
+        "createdAt": {
+          "$ref": "#/types/t_timestamp"
+        }
+      }
+    },
+    "t_token": {
+      "type": "object",
+      "properties": {
+        "accessToken": {
+          "type": "string",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        },
+        "refreshToken": {
+          "type": "string",
+          "value": "d8f9q2pZ..."
+        },
+        "expiresAt": {
+          "$ref": "#/types/t_timestamp",
+          "value": "2026-04-10T12:00:00Z"
+        }
+      }
+    },
+    "t_product": {
+      "type": "object",
+      "properties": {
+        "productId": {
+          "$ref": "#/types/t_uuid",
+          "value": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        },
+        "name": {
+          "type": "string",
+          "value": "Wireless Headphones"
+        },
+        "price": {
+          "type": "number",
+          "format": "decimal",
+          "value": 99.99
+        },
+        "currency": {
+          "type": "string",
+          "format": "iso4217",
+          "value": "USD"
+        },
+        "stock": {
+          "type": "integer",
+          "min": 0,
+          "value": 42
+        },
+        "category": {
+          "type": "string",
+          "value": "electronics"
+        }
+      }
+    },
+    "t_order": {
+      "type": "object",
+      "properties": {
+        "orderId": {
+          "$ref": "#/types/t_uuid"
+        },
+        "userId": {
+          "$ref": "#/types/t_uuid"
+        },
+        "items": {
+          "type": "array",
+          "items": "$ref:t_order_item"
+        },
+        "total": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "currency": {
+          "type": "string",
+          "format": "iso4217"
+        },
+        "status": {
+          "type": "enum",
+          "values": [
+            "pending",
+            "confirmed",
+            "shipped",
+            "delivered",
+            "cancelled"
+          ]
+        },
+        "createdAt": {
+          "$ref": "#/types/t_timestamp"
+        }
+      }
+    },
+    "t_order_item": {
+      "type": "object",
+      "properties": {
+        "productId": {
+          "$ref": "#/types/t_uuid"
+        },
+        "quantity": {
+          "type": "integer",
+          "min": 1
+        },
+        "unitPrice": {
+          "type": "number",
+          "format": "decimal"
+        }
+      }
+    },
+    "t_payment": {
+      "type": "object",
+      "properties": {
+        "paymentId": {
+          "$ref": "#/types/t_uuid"
+        },
+        "orderId": {
+          "$ref": "#/types/t_uuid"
+        },
+        "amount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "currency": {
+          "type": "string",
+          "format": "iso4217"
+        },
+        "status": {
+          "type": "enum",
+          "values": [
+            "pending",
+            "success",
+            "failed",
+            "refunded"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "processedAt": {
+          "$ref": "#/types/t_timestamp"
+        }
+      }
+    },
+    "t_notification": {
+      "type": "object",
+      "properties": {
+        "notificationId": {
+          "$ref": "#/types/t_uuid"
+        },
+        "userId": {
+          "$ref": "#/types/t_uuid"
+        },
+        "channel": {
+          "type": "enum",
+          "values": [
+            "email",
+            "sms",
+            "push"
+          ]
+        },
+        "template": {
+          "type": "string"
+        },
+        "payload": {
+          "type": "object"
+        },
+        "sentAt": {
+          "$ref": "#/types/t_timestamp"
+        }
+      }
+    },
+    "t_registration_request": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "password": {
+          "type": "string",
+          "minLength": 8
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "role": {
+          "type": "enum",
+          "values": [
+            "user",
+            "guest"
+          ],
+          "default": "user"
+        }
+      }
+    },
+    "t_search_params": {
+      "type": "object",
+      "properties": {
+        "q": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "required": false
+        },
+        "page": {
+          "type": "integer",
+          "min": 1,
+          "default": 1
+        },
+        "pageSize": {
+          "type": "integer",
+          "min": 1,
+          "max": 100,
+          "default": 20
+        },
+        "sortBy": {
+          "type": "enum",
+          "values": [
+            "price_asc",
+            "price_desc",
+            "name_asc",
+            "newest"
+          ],
+          "default": "newest"
+        }
+      }
+    },
+    "t_search_result": {
+      "type": "object",
+      "properties": {
+        "products": {
+          "type": "array",
+          "items": "$ref:t_product"
+        },
+        "meta": {
+          "$ref": "#/types/t_pagination"
+        },
+        "query": {
+          "type": "string"
+        }
+      }
+    },
+    "t_category_list": {
+      "type": "object",
+      "properties": {
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "t_pricing_request": {
+      "type": "object",
+      "properties": {
+        "productIds": {
+          "type": "array",
+          "items": "$ref:t_uuid",
+          "minItems": 1,
+          "maxItems": 100
+        },
+        "currency": {
+          "type": "string",
+          "format": "iso4217",
+          "default": "USD"
+        }
+      }
+    },
+    "t_pricing_response": {
+      "type": "object",
+      "properties": {
+        "prices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": {
+                "$ref": "#/types/t_uuid"
+              },
+              "price": {
+                "type": "number",
+                "format": "decimal"
+              },
+              "currency": {
+                "type": "string",
+                "format": "iso4217"
+              },
+              "discount": {
+                "type": "number",
+                "format": "decimal",
+                "nullable": true
+              },
+              "finalPrice": {
+                "type": "number",
+                "format": "decimal"
+              }
+            }
+          }
+        }
+      }
+    },
+    "t_inventory_item": {
+      "type": "object",
+      "properties": {
+        "productId": {
+          "$ref": "#/types/t_uuid"
+        },
+        "stock": {
+          "type": "integer",
+          "min": 0
+        },
+        "warehouse": {
+          "type": "string"
+        },
+        "reserved": {
+          "type": "integer",
+          "min": 0
+        },
+        "available": {
+          "type": "integer",
+          "min": 0
+        }
+      }
+    },
+    "t_inventory_response": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": "$ref:t_inventory_item"
+        },
+        "meta": {
+          "$ref": "#/types/t_pagination"
+        }
+      }
+    },
+    "t_checkout_request": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": "$ref:t_order_item"
+        },
+        "shippingAddress": {
+          "type": "object",
+          "properties": {
+            "line1": {
+              "type": "string"
+            },
+            "line2": {
+              "type": "string",
+              "nullable": true
+            },
+            "city": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "postalCode": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string",
+              "format": "iso3166-alpha2"
+            }
+          }
+        },
+        "paymentMethod": {
+          "type": "enum",
+          "values": [
+            "card",
+            "wallet",
+            "upi"
+          ]
+        },
+        "couponCode": {
+          "type": "string",
+          "nullable": true
+        }
+      }
+    },
+    "t_checkout_response": {
+      "type": "object",
+      "properties": {
+        "orderId": {
+          "$ref": "#/types/t_uuid"
+        },
+        "order": {
+          "$ref": "#/types/t_order"
+        },
+        "paymentIntent": {
+          "type": "object",
+          "properties": {
+            "clientSecret": {
+              "type": "string"
+            },
+            "amount": {
+              "type": "number",
+              "format": "decimal"
+            },
+            "currency": {
+              "type": "string",
+              "format": "iso4217"
+            }
+          }
+        },
+        "estimatedDelivery": {
+          "$ref": "#/types/t_timestamp"
+        }
+      }
+    },
+    "t_order_history_response": {
+      "type": "object",
+      "properties": {
+        "orders": {
+          "type": "array",
+          "items": "$ref:t_order"
+        },
+        "meta": {
+          "$ref": "#/types/t_pagination"
+        }
+      }
+    },
+    "t_shipping_status": {
+      "type": "object",
+      "properties": {
+        "orderId": {
+          "$ref": "#/types/t_uuid"
+        },
+        "status": {
+          "type": "enum",
+          "values": [
+            "processing",
+            "shipped",
+            "in_transit",
+            "out_for_delivery",
+            "delivered",
+            "returned"
+          ]
+        },
+        "carrier": {
+          "type": "string",
+          "nullable": true
+        },
+        "trackingNumber": {
+          "type": "string",
+          "nullable": true
+        },
+        "estimatedDelivery": {
+          "$ref": "#/types/t_timestamp",
+          "nullable": true
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "$ref": "#/types/t_timestamp"
+              },
+              "location": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "t_payment_status_response": {
+      "type": "object",
+      "properties": {
+        "paymentId": {
+          "$ref": "#/types/t_uuid"
+        },
+        "orderId": {
+          "$ref": "#/types/t_uuid"
+        },
+        "status": {
+          "type": "enum",
+          "values": [
+            "pending",
+            "success",
+            "failed",
+            "refunded"
+          ]
+        },
+        "amount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "currency": {
+          "type": "string",
+          "format": "iso4217"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "providerTransactionId": {
+          "type": "string",
+          "nullable": true
+        },
+        "processedAt": {
+          "$ref": "#/types/t_timestamp",
+          "nullable": true
+        },
+        "failureReason": {
+          "type": "string",
+          "nullable": true
+        }
+      }
+    },
+    "t_health_response": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "enum",
+          "values": [
+            "healthy",
+            "degraded",
+            "unhealthy"
+          ]
+        },
+        "uptime": {
+          "type": "integer",
+          "description": "Uptime in seconds"
+        },
+        "timestamp": {
+          "$ref": "#/types/t_timestamp"
+        },
+        "checks": {
+          "type": "object",
+          "properties": {
+            "database": {
+              "type": "string",
+              "enum": [
+                "ok",
+                "error"
+              ]
+            },
+            "kafka": {
+              "type": "string",
+              "enum": [
+                "ok",
+                "error"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "services": {
+    "svc_client": {
+      "displayName": "Web Client UI",
+      "type": "frontend",
+      "owned": true,
+      "stack": {
+        "language": "TypeScript",
+        "framework": "React"
+      },
+      "environments": {
+        "dev": {
+          "baseUrl": "http://localhost:8080"
+        },
+        "prod": {
+          "baseUrl": "https://myapp.com"
+        }
+      }
+    },
+    "svc_cloudflare": {
+      "displayName": "Cloudflare",
+      "type": "external",
+      "owned": false,
+      "vendor": "Cloudflare",
+      "description": "Edge network. TLS termination. DDoS protection. Rate limiting.",
+      "environments": {
+        "dev": {
+          "baseUrl": "https://dev.myapp.com"
+        },
+        "uat": {
+          "baseUrl": "https://uat.myapp.com"
+        },
+        "stage": {
+          "baseUrl": "https://stage.myapp.com"
+        },
+        "prod": {
+          "baseUrl": "https://myapp.com"
+        }
+      },
+      "endpoints": {}
+    },
+    "svc_gateway": {
+      "displayName": "API Gateway",
+      "type": "gateway",
+      "owned": true,
+      "team": "team_platform",
+      "stack": {
+        "language": "Node.js",
+        "framework": "Express",
+        "version": "20"
+      },
+      "repo": "github.com/org/api-gateway",
+      "middleware": [
+        "rate-limit",
+        "jwt-verify",
+        "request-decrypt",
+        "response-encrypt"
+      ],
+      "routes": [
+        {
+          "publicPath": "/api/v1/auth/*",
+          "targetService": "svc_auth",
+          "stripPrefix": false
+        },
+        {
+          "publicPath": "/api/v1/products/*",
+          "targetService": "svc_product",
+          "stripPrefix": true
+        },
+        {
+          "publicPath": "/api/v1/orders/*",
+          "targetService": "svc_order",
+          "stripPrefix": true
+        },
+        {
+          "publicPath": "/api/v1/payments/*",
+          "targetService": "svc_payment",
+          "stripPrefix": true
+        }
+      ],
+      "environments": {
+        "dev": {
+          "baseUrl": "http://localhost:3000"
+        },
+        "uat": {
+          "baseUrl": "http://gateway.uat.internal"
+        },
+        "stage": {
+          "baseUrl": "http://gateway.stage.internal"
+        },
+        "prod": {
+          "baseUrl": "http://gateway.prod.internal"
+        }
+      }
+    },
+    "svc_auth": {
+      "displayName": "Auth Service",
+      "type": "service",
+      "owned": true,
+      "team": "team_identity",
+      "stack": {
+        "language": "Go",
+        "framework": "Gin",
+        "version": "1.21"
+      },
+      "repo": "github.com/org/auth-service",
+      "env": [
+        "DB_AUTH_URL",
+        "JWT_SECRET",
+        "REDIS_HOST"
+      ],
+      "environments": {
+        "dev": {
+          "baseUrl": "http://localhost:3001"
+        },
+        "uat": {
+          "baseUrl": "http://auth.uat.internal"
+        },
+        "stage": {
+          "baseUrl": "http://auth.stage.internal"
+        },
+        "prod": {
+          "baseUrl": "http://auth.prod.internal"
+        }
+      },
+      "endpoints": {
+        "ep_register": {
+          "path": "/auth/v1/register",
+          "method": "POST",
+          "protocol": "REST",
+          "auth": "none",
+          "request": {
+            "$ref": "#/types/t_registration_request"
+          },
+          "responses": {
+            "201": {
+              "$ref": "#/types/t_user"
+            },
+            "400": {
+              "$ref": "#/types/t_error"
+            }
+          }
+        },
+        "ep_logout": {
+          "path": "/auth/v1/logout",
+          "method": "POST",
+          "protocol": "REST",
+          "auth": "bearer-jwt",
+          "responses": {
+            "200": {
+              "description": "Successfully logged out"
+            }
+          }
+        },
+        "ep_token_refresh": {
+          "path": "/auth/v1/token/refresh",
+          "method": "POST",
+          "protocol": "REST",
+          "auth": "none",
+          "request": {
+            "refreshToken": {
+              "type": "string",
+              "example": "d8f9q2pZ...",
+              "required": true
+            }
+          },
+          "responses": {
+            "200": {
+              "$ref": "#/types/t_token"
+            },
+            "401": {
+              "$ref": "#/types/t_error"
+            }
+          }
+        },
+        "ep_me": {
+          "path": "/auth/v1/me",
+          "method": "GET",
+          "protocol": "REST",
+          "auth": "bearer-jwt",
+          "responses": {
+            "200": {
+              "$ref": "#/types/t_user"
+            }
+          }
+        },
+        "ep_login": {
+          "path": "/auth/login",
+          "method": "POST",
+          "protocol": "REST",
+          "auth": "none",
+          "request": {
+            "email": {
+              "type": "string",
+              "format": "email",
+              "required": true,
+              "value": "email@gmail.com"
+            },
+            "password": {
+              "type": "string",
+              "min": 8,
+              "required": true,
+              "value": "password"
+            }
+          },
+          "responses": {
+            "200": {
+              "$ref": "#/types/t_token"
+            },
+            "401": {
+              "error": {
+                "type": "enum",
+                "values": [
+                  "INVALID_CREDENTIALS",
+                  "ACCOUNT_LOCKED"
+                ]
+              }
+            },
+            "429": {
+              "error": "string",
+              "retryAfter": "integer"
+            },
+            "500": {
+              "$ref": "#/types/t_error"
+            }
+          }
+        }
+      }
+    },
+    "svc_product": {
+      "displayName": "Product Service",
+      "type": "service",
+      "owned": true,
+      "team": "team_commerce",
+      "stack": {
+        "language": "Node.js",
+        "framework": "NestJS",
+        "version": "20"
+      },
+      "repo": "github.com/org/product-service",
+      "env": [
+        "DB_PRODUCTS_URL",
+        "REDIS_HOST"
+      ],
+      "environments": {
+        "dev": {
+          "baseUrl": "http://localhost:3002"
+        },
+        "prod": {
+          "baseUrl": "http://product.prod.internal"
+        }
+      },
+      "endpoints": {
+        "ep_get_products": {
+          "path": "/products",
+          "method": "GET",
+          "protocol": "REST",
+          "auth": "bearer-jwt",
+          "injectedContext": [
+            {
+              "header": "x-user-id",
+              "type": "uuid",
+              "description": "Injected by API Gateway after JWT verification"
+            }
+          ],
+          "request": {
+            "category": {
+              "type": "string",
+              "required": false,
+              "value": "electronics"
+            },
+            "page": {
+              "type": "integer",
+              "required": false,
+              "value": 1
+            },
+            "pageSize": {
+              "type": "integer",
+              "required": false,
+              "value": 20
+            }
+          },
+          "responses": {
+            "200": {
+              "products": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/types/t_product"
+                }
+              },
+              "meta": {
+                "$ref": "#/types/t_pagination"
+              }
+            },
+            "401": {
+              "$ref": "#/types/t_error"
+            },
+            "500": {
+              "$ref": "#/types/t_error"
+            }
+          }
+        },
+        "ep_products_search": {
+          "path": "/products/search",
+          "method": "GET",
+          "protocol": "REST",
+          "auth": "none",
+          "request": {
+            "$ref": "#/types/t_search_params"
+          },
+          "responses": {
+            "200": {
+              "$ref": "#/types/t_search_result"
+            }
+          }
+        },
+        "ep_products_categories": {
+          "path": "/products/categories",
+          "method": "GET",
+          "protocol": "REST",
+          "auth": "none",
+          "responses": {
+            "200": {
+              "$ref": "#/types/t_category_list"
+            }
+          }
+        },
+        "ep_products_pricing": {
+          "path": "/products/pricing",
+          "method": "POST",
+          "protocol": "REST",
+          "auth": "none",
+          "request": {
+            "$ref": "#/types/t_pricing_request"
+          },
+          "responses": {
+            "200": {
+              "$ref": "#/types/t_pricing_response"
+            }
+          }
+        },
+        "ep_products_inventory": {
+          "path": "/products/inventory",
+          "method": "GET",
+          "protocol": "REST",
+          "auth": "none",
+          "responses": {
+            "200": {
+              "$ref": "#/types/t_inventory_response"
+            }
+          }
+        }
+      }
+    },
+    "svc_order": {
+      "displayName": "Order Service",
+      "type": "service",
+      "owned": true,
+      "team": "team_commerce",
+      "stack": {
+        "language": "Node.js",
+        "framework": "NestJS",
+        "version": "20"
+      },
+      "repo": "github.com/org/order-service",
+      "env": [
+        "DB_ORDERS_URL",
+        "KAFKA_BROKER"
+      ],
+      "environments": {
+        "dev": {
+          "baseUrl": "http://localhost:3003"
+        },
+        "prod": {
+          "baseUrl": "http://order.prod.internal"
+        }
+      },
+      "endpoints": {
+        "ep_create_order": {
+          "path": "/orders",
+          "method": "POST",
+          "protocol": "REST",
+          "auth": "bearer-jwt",
+          "injectedContext": [
+            {
+              "header": "x-user-id",
+              "type": "uuid",
+              "description": "Injected by API Gateway after JWT verification"
+            }
+          ],
+          "request": {
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/types/t_order_item"
+              },
+              "required": true
+            }
+          },
+          "responses": {
+            "201": {
+              "$ref": "#/types/t_order"
+            },
+            "400": {
+              "error": {
+                "type": "enum",
+                "values": [
+                  "INVALID_ITEMS",
+                  "OUT_OF_STOCK"
+                ]
+              }
+            },
+            "401": {
+              "$ref": "#/types/t_error"
+            },
+            "500": {
+              "$ref": "#/types/t_error"
+            }
+          }
+        },
+        "ep_checkout": {
+          "path": "/orders/checkout",
+          "method": "POST",
+          "protocol": "REST",
+          "auth": "bearer-jwt",
+          "request": {
+            "$ref": "#/types/t_checkout_request"
+          },
+          "responses": {
+            "200": {
+              "$ref": "#/types/t_checkout_response"
+            }
+          }
+        },
+        "ep_orders_history": {
+          "path": "/orders/history",
+          "method": "GET",
+          "protocol": "REST",
+          "auth": "bearer-jwt",
+          "responses": {
+            "200": {
+              "$ref": "#/types/t_order_history_response"
+            }
+          }
+        },
+        "ep_orders_details": {
+          "path": "/orders/details",
+          "method": "GET",
+          "protocol": "REST",
+          "auth": "bearer-jwt",
+          "request": {
+            "orderId": {
+              "type": "string",
+              "in": "path",
+              "required": true,
+              "$ref": "#/types/t_uuid"
+            }
+          },
+          "responses": {
+            "200": {
+              "$ref": "#/types/t_order"
+            }
+          }
+        },
+        "ep_orders_track": {
+          "path": "/orders/track",
+          "method": "GET",
+          "protocol": "REST",
+          "auth": "bearer-jwt",
+          "request": {
+            "orderId": {
+              "type": "string",
+              "in": "query",
+              "required": true,
+              "$ref": "#/types/t_uuid"
+            }
+          },
+          "responses": {
+            "200": {
+              "$ref": "#/types/t_shipping_status"
+            }
+          }
+        },
+        "ep_orders_cancel": {
+          "path": "/orders/cancel",
+          "method": "POST",
+          "protocol": "REST",
+          "auth": "bearer-jwt",
+          "request": {
+            "orderId": {
+              "type": "string",
+              "required": true,
+              "$ref": "#/types/t_uuid"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "responses": {
+            "200": {
+              "$ref": "#/types/t_order"
+            }
+          }
+        }
+      }
+    },
+    "svc_payment": {
+      "displayName": "Payment Service",
+      "type": "service",
+      "owned": true,
+      "team": "team_payments",
+      "stack": {
+        "language": "Java",
+        "framework": "Spring Boot",
+        "version": "17"
+      },
+      "repo": "github.com/org/payment-service",
+      "env": [
+        "DB_PAYMENTS_URL",
+        "STRIPE_API_KEY",
+        "KAFKA_BROKER"
+      ],
+      "environments": {
+        "dev": {
+          "baseUrl": "http://localhost:3004"
+        },
+        "prod": {
+          "baseUrl": "http://payment.prod.internal"
+        }
+      },
+      "endpoints": {
+        "ep_process_payment": {
+          "path": "/payments",
+          "method": "POST",
+          "protocol": "REST",
+          "auth": "internal-service-token",
+          "headers": {
+            "x-service-token": {
+              "type": "string",
+              "description": "Internal S2S token generated by caller"
+            }
+          },
+          "request": {
+            "orderId": {
+              "$ref": "#/types/t_uuid",
+              "required": true
+            },
+            "amount": {
+              "type": "number",
+              "format": "decimal",
+              "required": true
+            },
+            "currency": {
+              "type": "string",
+              "format": "iso4217",
+              "required": true
+            },
+            "userId": {
+              "$ref": "#/types/t_uuid",
+              "required": true
+            }
+          },
+          "responses": {
+            "200": {
+              "$ref": "#/types/t_payment"
+            },
+            "402": {
+              "error": {
+                "type": "enum",
+                "values": [
+                  "INSUFFICIENT_FUNDS",
+                  "CARD_DECLINED"
+                ]
+              }
+            },
+            "500": {
+              "$ref": "#/types/t_error"
+            }
+          }
+        },
+        "ep_payments_status": {
+          "path": "/payments/status",
+          "method": "GET",
+          "protocol": "REST",
+          "auth": "bearer-jwt",
+          "request": {
+            "paymentId": {
+              "type": "string",
+              "in": "query",
+              "required": true,
+              "$ref": "#/types/t_uuid"
+            }
+          },
+          "responses": {
+            "200": {
+              "$ref": "#/types/t_payment_status_response"
+            }
+          }
+        }
+      }
+    },
+    "svc_inventory": {
+      "displayName": "Inventory Service",
+      "type": "service",
+      "owned": true,
+      "team": "team_commerce",
+      "stack": {
+        "language": "Go",
+        "framework": "Gin",
+        "version": "1.21"
+      },
+      "repo": "github.com/org/inventory-service",
+      "env": [
+        "DB_INVENTORY_URL"
+      ],
+      "environments": {
+        "dev": {
+          "baseUrl": "http://localhost:3005"
+        },
+        "prod": {
+          "baseUrl": "http://inventory.prod.internal"
+        }
+      },
+      "endpoints": {
+        "ep_check_stock": {
+          "path": "/inventory.InventoryService/CheckStock",
+          "method": "CheckStock",
+          "protocol": "gRPC",
+          "responses": {
+            "OK": {
+              "available": "boolean",
+              "items": "array"
+            },
+            "NOT_FOUND": {
+              "message": "string"
+            },
+            "UNAVAILABLE": {
+              "message": "string"
+            }
+          },
+          "proto": {
+            "inline": true,
+            "definition": {
+              "package": "inventory",
+              "service": "InventoryService",
+              "rpc": "CheckStock",
+              "request": {
+                "items": {
+                  "type": "repeated",
+                  "message": "StockItem"
+                }
+              },
+              "messages": {
+                "StockItem": {
+                  "product_id": {
+                    "type": "string"
+                  },
+                  "quantity": {
+                    "type": "int32"
+                  }
+                },
+                "StockResponse": {
+                  "available": {
+                    "type": "bool"
+                  },
+                  "items": {
+                    "type": "repeated",
+                    "message": "StockItem"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "svc_notification": {
+      "displayName": "Notification Service",
+      "type": "service",
+      "owned": true,
+      "team": "team_comms",
+      "stack": {
+        "language": "Python",
+        "framework": "FastAPI",
+        "version": "3.12"
+      },
+      "repo": "github.com/org/notification-service",
+      "env": [
+        "KAFKA_BROKER",
+        "SMTP_URL",
+        "SMS_API_KEY"
+      ],
+      "environments": {
+        "dev": {
+          "baseUrl": "http://localhost:3006"
+        },
+        "prod": {
+          "baseUrl": "http://notify.prod.internal"
+        }
+      },
+      "endpoints": {
+        "ep_health": {
+          "path": "/health",
+          "method": "GET",
+          "protocol": "REST",
+          "auth": "none",
+          "responses": {
+            "200": {
+              "$ref": "#/types/t_health_response"
+            }
+          }
+        }
+      }
+    },
+    "svc_stripe": {
+      "displayName": "Stripe",
+      "type": "external",
+      "owned": false,
+      "vendor": "Stripe",
+      "description": "Payment processing provider",
+      "environments": {
+        "dev": {
+          "baseUrl": "https://api.stripe.com"
+        },
+        "prod": {
+          "baseUrl": "https://api.stripe.com"
+        }
+      },
+      "endpoints": {
+        "ep_stripe_charge": {
+          "path": "/v1/charges",
+          "method": "POST",
+          "protocol": "REST",
+          "auth": "api-key"
+        }
+      }
+    }
+  },
+  "datastores": {
+    "db_auth": {
+      "displayName": "Auth DB",
+      "type": "postgresql",
+      "owned": true,
+      "owner": "svc_auth",
+      "entities": {
+        "users": {
+          "fields": {
+            "id": {
+              "type": "uuid",
+              "primaryKey": true
+            },
+            "email": {
+              "type": "string",
+              "unique": true,
+              "nullable": false
+            },
+            "password_hash": {
+              "type": "string",
+              "nullable": false
+            },
+            "role": {
+              "type": "enum",
+              "values": [
+                "admin",
+                "user",
+                "guest"
+              ]
+            },
+            "created_at": {
+              "type": "timestamp",
+              "default": "now()"
+            },
+            "updated_at": {
+              "type": "timestamp",
+              "default": "now()"
+            }
+          },
+          "indexes": [
+            {
+              "name": "idx_users_email",
+              "fields": [
+                "email"
+              ],
+              "unique": true
+            },
+            {
+              "name": "idx_users_role",
+              "fields": [
+                "role"
+              ]
+            }
+          ],
+          "implements": "#/types/t_user"
+        },
+        "refresh_tokens": {
+          "fields": {
+            "id": {
+              "type": "uuid",
+              "primaryKey": true
+            },
+            "user_id": {
+              "type": "uuid",
+              "foreignKey": "users.id"
+            },
+            "token_hash": {
+              "type": "string",
+              "nullable": false
+            },
+            "expires_at": {
+              "type": "timestamp",
+              "nullable": false
+            },
+            "revoked": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "indexes": [
+            {
+              "name": "idx_tokens_user",
+              "fields": [
+                "user_id"
+              ]
+            },
+            {
+              "name": "idx_tokens_hash",
+              "fields": [
+                "token_hash"
+              ],
+              "unique": true
+            }
+          ]
+        }
+      }
+    },
+    "db_orders": {
+      "displayName": "Orders DB",
+      "type": "postgresql",
+      "owned": true,
+      "owner": "svc_order",
+      "entities": {
+        "orders": {
+          "fields": {
+            "id": {
+              "type": "uuid",
+              "primaryKey": true
+            },
+            "user_id": {
+              "type": "uuid",
+              "nullable": false
+            },
+            "total": {
+              "type": "decimal",
+              "precision": 10,
+              "scale": 2
+            },
+            "currency": {
+              "type": "string",
+              "length": 3
+            },
+            "status": {
+              "type": "enum",
+              "values": [
+                "pending",
+                "confirmed",
+                "shipped",
+                "delivered",
+                "cancelled"
+              ]
+            },
+            "created_at": {
+              "type": "timestamp",
+              "default": "now()"
+            }
+          },
+          "indexes": [
+            {
+              "name": "idx_orders_user",
+              "fields": [
+                "user_id"
+              ]
+            },
+            {
+              "name": "idx_orders_status",
+              "fields": [
+                "status"
+              ]
+            },
+            {
+              "name": "idx_orders_created",
+              "fields": [
+                "created_at"
+              ],
+              "sort": "DESC"
+            }
+          ],
+          "implements": "#/types/t_order"
+        },
+        "order_items": {
+          "fields": {
+            "id": {
+              "type": "uuid",
+              "primaryKey": true
+            },
+            "order_id": {
+              "type": "uuid",
+              "foreignKey": "orders.id"
+            },
+            "product_id": {
+              "type": "uuid",
+              "nullable": false
+            },
+            "quantity": {
+              "type": "integer",
+              "min": 1
+            },
+            "unit_price": {
+              "type": "decimal",
+              "precision": 10,
+              "scale": 2
+            }
+          },
+          "indexes": [
+            {
+              "name": "idx_items_order",
+              "fields": [
+                "order_id"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "cache_sessions": {
+      "displayName": "Session Cache",
+      "type": "redis",
+      "owned": true,
+      "owner": "svc_auth",
+      "keyPattern": "session:{userId}",
+      "ttl": 3600,
+      "value": {
+        "$ref": "#/types/t_token"
+      }
+    },
+    "queue_notifications": {
+      "displayName": "Notification Queue",
+      "type": "kafka",
+      "owned": true,
+      "owner": "svc_notification",
+      "topics": {
+        "user.registered": {
+          "payload": {
+            "$ref": "#/types/t_user"
+          }
+        },
+        "order.confirmed": {
+          "payload": {
+            "$ref": "#/types/t_order"
+          }
+        },
+        "payment.success": {
+          "payload": {
+            "$ref": "#/types/t_payment"
+          }
+        },
+        "payment.failed": {
+          "payload": {
+            "$ref": "#/types/t_payment"
+          }
+        }
+      }
+    }
+  },
+  "contracts": {
+    "c_client_to_cf": {
+      "from": "svc_client",
+      "to": "svc_cloudflare",
+      "protocol": "HTTPS",
+      "passthrough": true
+    },
+    "c_cf_to_gateway": {
+      "from": "svc_cloudflare",
+      "to": "svc_gateway",
+      "protocol": "REST",
+      "timeout": 10000,
+      "passthrough": true
+    },
+    "c_login": {
+      "from": "svc_gateway",
+      "to": "svc_auth",
+      "endpoint": "ep_login",
+      "protocol": "REST",
+      "pattern": "sync-request-response",
+      "criticality": "critical",
+      "timeout": 3000,
+      "retry": {
+        "attempts": 3,
+        "backoff": "exponential"
+      }
+    },
+    "c_get_products": {
+      "from": "svc_gateway",
+      "to": "svc_product",
+      "endpoint": "ep_get_products",
+      "protocol": "REST",
+      "pattern": "sync-request-response",
+      "criticality": "high",
+      "timeout": 5000,
+      "retry": {
+        "attempts": 3,
+        "backoff": "linear"
+      }
+    },
+    "c_create_order": {
+      "from": "svc_gateway",
+      "to": "svc_order",
+      "endpoint": "ep_create_order",
+      "protocol": "REST",
+      "pattern": "sync-request-response",
+      "criticality": "critical",
+      "timeout": 5000,
+      "retry": {
+        "attempts": 3,
+        "backoff": "linear"
+      }
+    },
+    "c_check_inventory": {
+      "from": "svc_order",
+      "to": "svc_inventory",
+      "endpoint": "ep_check_stock",
+      "protocol": "gRPC",
+      "pattern": "sync-request-response",
+      "criticality": "critical",
+      "timeout": 2000,
+      "retry": {
+        "attempts": 2,
+        "backoff": "fixed"
+      }
+    },
+    "c_process_payment": {
+      "from": "svc_order",
+      "to": "svc_payment",
+      "endpoint": "ep_process_payment",
+      "protocol": "REST",
+      "pattern": "sync-request-response",
+      "criticality": "critical",
+      "timeout": 10000,
+      "retry": {
+        "attempts": 0
+      }
+    },
+    "c_stripe_charge": {
+      "from": "svc_payment",
+      "to": "svc_stripe",
+      "endpoint": "ep_stripe_charge",
+      "protocol": "REST",
+      "pattern": "sync-request-response",
+      "criticality": "critical",
+      "timeout": 15000,
+      "retry": {
+        "attempts": 1
+      }
+    },
+    "c_publish_order_confirmed": {
+      "from": "svc_order",
+      "to": "queue_notifications",
+      "protocol": "kafka",
+      "pattern": "fire-and-forget",
+      "topic": "order.confirmed.v1",
+      "criticality": "medium"
+    },
+    "c_publish_payment_result": {
+      "from": "svc_payment",
+      "to": "queue_notifications",
+      "protocol": "kafka",
+      "pattern": "fire-and-forget",
+      "topics": [
+        "payment.success.v1",
+        "payment.failed.v1"
+      ],
+      "criticality": "medium"
+    },
+    "c_send_notification": {
+      "from": "queue_notifications",
+      "to": "svc_notification",
+      "protocol": "kafka",
+      "pattern": "subscribe-and-consume",
+      "topics": [
+        "order.confirmed.v1",
+        "payment.success.v1",
+        "payment.failed.v1"
+      ],
+      "criticality": "low"
+    }
+  },
+  "flows": {
+    "flow_user_login": {
+      "displayName": "User Login",
+      "description": "Complete login journey from client submitting credentials to receiving JWT token",
+      "trigger": "User submits login form",
+      "tasks": [
+        {
+          "task": 1,
+          "type": "network",
+          "ref": "c_client_to_cf",
+          "onSuccess": "next",
+          "onFailure": "abort"
+        },
+        {
+          "task": 2,
+          "type": "network",
+          "ref": "c_cf_to_gateway",
+          "onSuccess": "next",
+          "onFailure": "abort"
+        },
+        {
+          "task": 3,
+          "type": "network",
+          "ref": "c_login",
+          "onSuccess": "next",
+          "onFailure": "abort"
+        },
+        {
+          "task": 4,
+          "type": "compute",
+          "owner": "svc_auth",
+          "description": "Verify password hash against stored bcrypt hash in db_auth.users",
+          "onSuccess": "next",
+          "onFailure": "abort"
+        },
+        {
+          "task": 5,
+          "type": "db",
+          "owner": "svc_auth",
+          "description": "Generate JWT access token and refresh token. Store refresh token hash in db_auth.refresh_tokens. Cache session in cache_sessions.",
+          "onSuccess": "next",
+          "onFailure": "abort"
+        }
+      ]
+    },
+    "flow_checkout": {
+      "displayName": "Checkout",
+      "description": "Complete purchase flow from cart submission to order confirmation and payment",
+      "trigger": "User clicks Place Order",
+      "tasks": [
+        {
+          "task": 1,
+          "type": "network",
+          "ref": "c_create_order",
+          "onSuccess": "next",
+          "onFailure": "abort"
+        },
+        {
+          "task": 2,
+          "type": "network",
+          "ref": "c_check_inventory",
+          "onSuccess": "next",
+          "onFailure": "abort"
+        },
+        {
+          "task": 3,
+          "type": "compute",
+          "owner": "svc_order",
+          "description": "Reserve inventory. Mark items as held pending payment confirmation.",
+          "onSuccess": "next",
+          "onFailure": "abort"
+        },
+        {
+          "task": 4,
+          "type": "network",
+          "ref": "c_process_payment",
+          "onSuccess": "next",
+          "onFailure": "compensate",
+          "compensate": {
+            "type": "logic",
+            "owner": "svc_order",
+            "description": "Release inventory hold. Set order status to cancelled."
+          }
+        },
+        {
+          "task": 5,
+          "type": "network",
+          "ref": "c_stripe_charge",
+          "onSuccess": "next",
+          "onFailure": "compensate",
+          "compensate": {
+            "type": "logic",
+            "owner": "svc_payment",
+            "description": "Void payment intent. Notify order service of failure."
+          }
+        },
+        {
+          "task": 6,
+          "type": "db",
+          "owner": "svc_order",
+          "description": "Set order status to confirmed. Write final record to db_orders.",
+          "onSuccess": "next",
+          "onFailure": "abort"
+        },
+        {
+          "task": 7,
+          "type": "network",
+          "ref": "c_publish_order_confirmed",
+          "onSuccess": "next",
+          "onFailure": "continue"
+        }
+      ]
+    }
+  }
+}
