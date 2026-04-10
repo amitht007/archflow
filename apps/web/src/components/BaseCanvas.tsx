@@ -493,7 +493,7 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
 
   const onEdgeContextMenu = useCallback((e: React.MouseEvent, edge: Edge) => {
     e.preventDefault();
-    const cleanId = edge.id.split('_flex_')[0].replace('edge_', '');
+    const cleanId = edge.id.replace('edge_', '');
     setContextMenu({ x: e.clientX, y: e.clientY, edgeId: cleanId, type: 'edge' });
   }, []);
 
@@ -505,7 +505,13 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
   const handleContextDelete = useCallback((id: string, type: 'node' | 'edge') => {
     yDoc.transact(() => {
       if (type === 'edge') {
-        contractsMap.delete(id);
+        if (id.startsWith('owner_')) {
+          const dsId = id.replace('owner_', '');
+          const dsMap = datastoresMap.get(dsId);
+          if (dsMap instanceof Y.Map) dsMap.set('owner', '');
+        } else {
+          contractsMap.delete(id);
+        }
       } else {
         const isAnnotation = annotationsMap.has(id);
         const isDatastore  = datastoresMap.has(id);
@@ -739,8 +745,7 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
         contractsMap.forEach((contract: any, id: string) => {
           const from = contract.get('from');
           const to = contract.get('to');
-          const svcId = node.id.replace('svc_', '');
-          if (from === svcId || to === svcId || to === node.id) {
+          if (from === node.id || to === node.id) {
             contractsMap.delete(id);
           }
         });
@@ -987,8 +992,8 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
           onEdgeClick={(_, edge) => {
             const cleanId = edge.id;
             const originalId = cleanId.replace('edge_', '');
-            const type = cleanId.includes('owner') ? null : 'contract';
-            if (type) setSelected(originalId, type);
+            // Allow selection for all edges (including owner lines) so they can be deleted
+            setSelected(originalId, 'contract');
           }}
           onPaneClick={() => { clearSelection(); setContextMenu(null); }}
           fitView
