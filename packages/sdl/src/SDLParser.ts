@@ -75,7 +75,7 @@ export class SDLParser {
    * Recursively converts a plain JS object/array to Yjs types.
    * This ensures that nested structures are collaboratively editable.
    */
-  private toYjsType(value: any): any {
+  public toYjsType(value: any): any {
     if (Array.isArray(value)) {
       const yArray = new Y.Array();
       yArray.push(value.map((v) => this.toYjsType(v)));

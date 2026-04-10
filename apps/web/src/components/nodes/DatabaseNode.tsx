@@ -18,8 +18,8 @@ const DatabaseNode = ({ data, selected }: NodeProps) => {
       <div className={`flex flex-col w-[180px] transition-all duration-300 ${selected ? 'scale-105 filter drop-shadow-[0_0_10px_rgba(234,179,8,0.4)]' : ''}`}>
         <div className="cylinder-top opacity-100 border-2 border-b-0 border-database bg-database/20"></div>
         <div className="cylinder-body border-2 border-t-0 border-database shadow-lg bg-bg-node-solid">
-          <div className="flex items-center justify-center gap-2 py-2">
-            <span className="text-base">🗄️</span>
+          <div className="flex items-center justify-center gap-2 py-3">
+            <span className="text-xl">🗄️</span>
             <span className="text-sm font-bold tracking-tight text-text-primary">{data.displayName}</span>
           </div>
         </div>

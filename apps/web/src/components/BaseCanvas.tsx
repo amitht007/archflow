@@ -16,25 +16,14 @@ import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { SDLParser } from '../../../../packages/sdl/src/SDLParser';
 
-// Custom Nodes
+import { yDoc, provider, servicesMap, contractsMap, datastoresMap, canvasPositionsMap } from '../lib/yjs';
+import { useSelectionStore, SelectionType } from '../store/selectionStore';
+
 import ServiceNode from './nodes/ServiceNode';
 import GatewayNode from './nodes/GatewayNode';
 import ExternalNode from './nodes/ExternalNode';
 import DatabaseNode from './nodes/DatabaseNode';
-
-// ─── Yjs Configuration ───────────────────────────────────────────────────────
-
-const yDoc = new Y.Doc();
-const provider = new WebsocketProvider(
-  import.meta.env.VITE_WS_URL || 'ws://localhost:3001/ws',
-  'archflow-main',
-  yDoc
-);
-
-const servicesMap = yDoc.getMap('services');
-const contractsMap = yDoc.getMap('contracts');
-const datastoresMap = yDoc.getMap('datastores');
-const canvasPositionsMap = yDoc.getMap('canvasPositions');
+import Inspector from './Inspector';
 
 const parser = new SDLParser();
 
@@ -163,6 +152,7 @@ const BaseCanvas: React.FC<{ theme?: 'dark' | 'light' }> = ({ theme }) => {
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [isSdlOpen, setIsSdlOpen] = useState(false);
+  const { setSelected, clearSelection } = useSelectionStore();
 
   // Track WebSocket connection status
   useEffect(() => {
@@ -238,8 +228,6 @@ const BaseCanvas: React.FC<{ theme?: 'dark' | 'light' }> = ({ theme }) => {
           id: `edge_${id}`,
           source,
           target,
-          type: 'smoothstep',
-          pathOptions: { borderRadius: 16 },
           sourceHandle: 'r',
           targetHandle: 'l',
           label: protocol,
@@ -266,8 +254,6 @@ const BaseCanvas: React.FC<{ theme?: 'dark' | 'light' }> = ({ theme }) => {
           id: `edge_owner_${id}`,
           source,
           target: id,
-          type: 'smoothstep',
-          pathOptions: { borderRadius: 16 },
           sourceHandle: 'r',
           targetHandle: 'l',
           label: 'uses',
@@ -457,6 +443,15 @@ const BaseCanvas: React.FC<{ theme?: 'dark' | 'light' }> = ({ theme }) => {
           onEdgesChange={onEdgesChange}
           onNodeMouseEnter={onNodeMouseEnter}
           onNodeMouseLeave={onNodeMouseLeave}
+          onNodeClick={(_, node) => setSelected(node.id, node.type as SelectionType)}
+          onEdgeClick={(_, edge) => {
+            // Edges are usually purely contracts, but we might have ownership edges
+            const originalId = edge.id.replace('edge_', '');
+            // Simple type check since ownership strings have "_owner"
+            const type = edge.id.includes('owner') ? null : 'contract';
+            if (type) setSelected(originalId, type);
+          }}
+          onPaneClick={clearSelection}
           fitView
           fitViewOptions={{ padding: 0.15 }}
           snapToGrid
@@ -567,6 +562,9 @@ const BaseCanvas: React.FC<{ theme?: 'dark' | 'light' }> = ({ theme }) => {
           </div>
         )}
       </aside>
+
+      {/* Inspector Sidebar Overlay */}
+      <Inspector />
     </div>
   );
 };
