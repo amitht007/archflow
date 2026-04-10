@@ -695,6 +695,11 @@
           "publicPath": "/api/v1/payments/*",
           "targetService": "svc_payment",
           "stripPrefix": true
+        },
+        {
+          "publicPath": "/api/v1/notifications/*",
+          "targetService": "svc_notification",
+          "stripPrefix": true
         }
       ],
       "environments": {
@@ -1328,6 +1333,46 @@
               "$ref": "#/types/t_health_response"
             }
           }
+        },
+        "ep_send_notification": {
+          "path": "/notifications/send",
+          "method": "POST",
+          "protocol": "REST",
+          "auth": "internal-service-token",
+          "request": {
+            "channel": {
+              "type": "string",
+              "enum": ["EMAIL", "SMS", "PUSH"]
+            },
+            "recipientId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "template": {
+              "type": "string"
+            },
+            "payload": {
+              "type": "object"
+            }
+          },
+          "responses": {
+            "202": {
+              "description": "Notification queued for delivery"
+            }
+          }
+        },
+        "ep_get_status": {
+          "path": "/notifications/{id}/status",
+          "method": "GET",
+          "protocol": "REST",
+          "auth": "internal-service-token",
+          "responses": {
+            "200": {
+              "status": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },
@@ -1678,6 +1723,56 @@
       "timeout": 15000,
       "retry": {
         "attempts": 1
+      }
+    },
+    "c_gateway_to_notification": {
+      "from": "svc_gateway",
+      "to": "svc_notification",
+      "endpoint": "ep_send_notification",
+      "protocol": "REST",
+      "pattern": "fire-and-forget",
+      "criticality": "medium",
+      "timeout": 3000,
+      "retry": {
+        "attempts": 2,
+        "backoff": "exponential"
+      }
+    },
+    "c_auth_to_notification": {
+      "from": "svc_auth",
+      "to": "svc_notification",
+      "endpoint": "ep_send_notification",
+      "protocol": "REST",
+      "pattern": "fire-and-forget",
+      "criticality": "medium",
+      "timeout": 2000,
+      "retry": {
+        "attempts": 3,
+        "backoff": "linear"
+      }
+    },
+    "c_order_to_notification": {
+      "from": "svc_order",
+      "to": "svc_notification",
+      "endpoint": "ep_send_notification",
+      "protocol": "REST",
+      "pattern": "fire-and-forget",
+      "criticality": "low",
+      "timeout": 2000,
+      "retry": {
+        "attempts": 2
+      }
+    },
+    "c_payment_to_notification": {
+      "from": "svc_payment",
+      "to": "svc_notification",
+      "endpoint": "ep_send_notification",
+      "protocol": "REST",
+      "pattern": "fire-and-forget",
+      "criticality": "low",
+      "timeout": 2000,
+      "retry": {
+        "attempts": 2
       }
     },
     "c_publish_order_confirmed": {

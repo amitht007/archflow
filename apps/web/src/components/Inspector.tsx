@@ -57,6 +57,11 @@ const Inspector: React.FC = () => {
       }
       nested.set(path[1], value);
     }
+
+    // Special case for morphing: 'external' implies owned=false
+    if (path[0] === 'type') {
+      mapItem.set('owned', value !== 'external');
+    }
   };
 
   const updateEndpoint = (endpointPath: string, key: string, value: any) => {
@@ -77,7 +82,7 @@ const Inspector: React.FC = () => {
   };
 
   return (
-    <div className="w-[450px] shrink-0 h-full bg-bg-sidebar border-l border-white/10 backdrop-blur-3xl z-[150] shadow-[-20px_0_40px_rgba(0,0,0,0.3)] flex flex-col transition-all duration-300 absolute right-0 top-0">
+    <div className="flex flex-col h-full w-full bg-transparent">
       <div className="flex justify-between items-center p-5 border-b border-white/5">
         <h2 className="m-0 text-sm tracking-wider uppercase font-bold flex items-center gap-2 text-text-primary">
           {selectedType === 'service' || selectedType === 'gateway' || selectedType === 'external' ? <Server size={16} className="text-service" /> : null}
@@ -85,9 +90,25 @@ const Inspector: React.FC = () => {
           {selectedType === 'datastore' ? <Database size={16} className="text-database" /> : null}
           {selectedType === 'contract' ? 'Contract Details' : 'Node Properties'}
         </h2>
-        <button onClick={clearSelection} className="text-text-secondary hover:text-text-primary transition-colors">
-          <X size={18} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => {
+              const confirm = window.confirm(`Permanently delete ${selectedId}?`);
+              if (!confirm) return;
+              
+              const targetMap = selectedType === 'contract' ? contractsMap : (selectedType === 'datastore' ? datastoresMap : servicesMap);
+              targetMap.delete(selectedId);
+              clearSelection();
+            }}
+            className="p-1.5 rounded hover:bg-red-500/20 text-text-secondary hover:text-red-500 transition-all"
+            title="Delete this node"
+          >
+            <Trash2 size={16} />
+          </button>
+          <button onClick={clearSelection} className="text-text-secondary hover:text-text-primary transition-colors">
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="p-5 flex-1 overflow-y-auto flex flex-col gap-6 no-scrollbar">
@@ -179,30 +200,60 @@ const Inspector: React.FC = () => {
                           disabled
                           className="bg-transparent text-xs text-text-primary flex-1 font-mono outline-none opacity-50"
                         />
+                        <button 
+                          onClick={() => {
+                            const mapItem = servicesMap.get(selectedId);
+                            if (mapItem instanceof Y.Map) {
+                              const eps = mapItem.get('endpoints');
+                              if (eps instanceof Y.Map) eps.delete(epath);
+                            }
+                          }}
+                          className="p-1 rounded hover:bg-red-500/20 text-text-secondary hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={12} />
+                        </button>
                       </div>
-                      <div className="p-3">
-                        <label className="flex items-center justify-between text-[10px] uppercase text-text-secondary mb-2">
-                          <span className="flex items-center gap-1"><FileJson size={10} /> Request Schema</span>
-                        </label>
-                        <div className="h-32 border border-white/10 rounded overflow-hidden">
-                          <Editor
-                            height="100%"
-                            defaultLanguage="json"
-                            theme="vs-dark"
-                            value={JSON.stringify(epData?.request?.schema || {}, null, 2)}
-                            onChange={(val) => {
-                              try {
-                                const parsed = JSON.parse(val || '{}');
-                                // Only update on valid JSON to avoid breaking Yjs structure constantly
-                                const requestMap = epData?.request instanceof Y.Map ? epData.request : new Y.Map();
-                                requestMap.set('schema', parser.toYjsType(parsed));
-                                updateEndpoint(epath, 'request', requestMap);
-                              } catch(e) { /* ignore parse errors while typing */ }
-                            }}
-                            options={{ minimap: { enabled: false }, fontSize: 11, lineNumbers: 'off', scrollBeyondLastLine: false }}
-                          />
+                        <div className="p-3">
+                          <label className="flex items-center justify-between text-[10px] uppercase text-text-secondary mb-2">
+                            <span className="flex items-center gap-1"><FileJson size={10} /> Request Payload</span>
+                          </label>
+                          <div className="h-32 border border-white/10 rounded overflow-hidden">
+                            <Editor
+                              height="100%"
+                              defaultLanguage="json"
+                              theme="vs-dark"
+                              value={JSON.stringify(epData?.request || {}, null, 2)}
+                              onChange={(val) => {
+                                try {
+                                  const parsed = JSON.parse(val || '{}');
+                                  const requestMap = parser.toYjsType(parsed);
+                                  updateEndpoint(epath, 'request', requestMap);
+                                } catch(e) { /* ignore parse errors while typing */ }
+                              }}
+                              options={{ minimap: { enabled: false }, fontSize: 11, lineNumbers: 'off', scrollBeyondLastLine: false }}
+                            />
+                          </div>
+
+                          <label className="flex items-center justify-between text-[10px] uppercase text-text-secondary mb-2 mt-4">
+                            <span className="flex items-center gap-1"><FileJson size={10} /> Responses</span>
+                          </label>
+                          <div className="h-32 border border-white/10 rounded overflow-hidden">
+                            <Editor
+                              height="100%"
+                              defaultLanguage="json"
+                              theme="vs-dark"
+                              value={JSON.stringify(epData?.responses || {}, null, 2)}
+                              onChange={(val) => {
+                                try {
+                                  const parsed = JSON.parse(val || '{}');
+                                  const responseMap = parser.toYjsType(parsed);
+                                  updateEndpoint(epath, 'responses', responseMap);
+                                } catch(e) { /* ignore parse errors while typing */ }
+                              }}
+                              options={{ minimap: { enabled: false }, fontSize: 11, lineNumbers: 'off', scrollBeyondLastLine: false }}
+                            />
+                          </div>
                         </div>
-                      </div>
                     </div>
                   ))}
                   {Object.keys(data.endpoints || {}).length === 0 && (
