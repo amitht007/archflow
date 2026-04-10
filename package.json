@@ -1,0 +1,29 @@
+{
+  "name": "archflow",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ArchFlow — AI-driven microservice scaffolding platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter './apps/*' dev",
+    "dev:web": "bun run --filter '@archflow/web' dev",
+    "dev:api": "bun run --filter '@archflow/api' dev",
+    "build": "bun run --filter '*' build",
+    "lint": "bun run --filter '*' lint",
+    "typecheck": "bun run --filter '*' typecheck",
+    "clean": "bun run --filter '*' clean",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
+  },
+  "dependencies": {
+    "yjs": "^13.6.14",
+    "y-websocket": "^2.0.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

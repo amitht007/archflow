@@ -1,0 +1,25 @@
+{
+  "name": "@archflow/sdl",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared SDL parser and logic utilities for ArchFlow",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./SDLParser": "./src/SDLParser.ts"
+  },
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@archflow/types": "workspace:*",
+    "yjs": "^13.6.30"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
