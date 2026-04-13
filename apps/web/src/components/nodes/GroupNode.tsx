@@ -40,7 +40,7 @@ const GroupNode = ({ data, selected, id }: NodeProps) => {
         borderRadius: 12,
         position: 'relative',
       }}
-      className="transition-all duration-200"
+      className=""
     >
       <NodeResizer
         minWidth={200}

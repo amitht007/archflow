@@ -8,7 +8,7 @@ const ServiceNode = ({ data, selected }: NodeProps) => {
   return (
     <div
       onDoubleClick={() => setIsOpen(!isOpen)}
-      className={`relative px-0 transition-all duration-300 min-w-[180px] group`}>
+      className={`relative px-0 min-w-[180px] group`}>
       <Handle type="target" position={Position.Top} id="top-target" className="!bg-service !w-2 !h-2 border-none ring-2 ring-bg-primary z-50 transition-transform hover:scale-150" />
       <Handle type="source" position={Position.Top} id="top-source" className="!w-4 !h-4 opacity-0 z-50 absolute -top-1" />
 

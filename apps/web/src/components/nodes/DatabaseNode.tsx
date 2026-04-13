@@ -6,7 +6,7 @@ const DatabaseNode = ({ data, selected }: NodeProps) => {
 
   return (
     <div 
-      className={`relative bg-transparent border-none shadow-none backdrop-filter-none min-w-[180px] transition-all duration-300 group`}
+      className={`relative bg-transparent border-none shadow-none backdrop-filter-none min-w-[180px] group`}
     >
       <Handle type="target" position={Position.Top} id="top-target" className="!bg-database !w-2 !h-2 border-none ring-2 ring-bg-primary z-50 transition-transform hover:scale-150" />
       <Handle type="source" position={Position.Top} id="top-source" className="!w-4 !h-4 opacity-0 z-50 absolute -top-1" />

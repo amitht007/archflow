@@ -36,6 +36,7 @@ import GroupNode from './nodes/GroupNode';
 import Inspector from './Inspector';
 import ContextMenu, { ContextMenuState } from './ContextMenu';
 import ComponentLibrary, { decodeDragData, PaletteItemType } from './ComponentLibrary';
+import { CanvasCreationPopover } from './CanvasCreationPopover';
 
 const parser = new SDLParser();
 
@@ -184,7 +185,7 @@ const nodeTypes = {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => void }> = ({ theme, toggleTheme }) => {
+const BaseCanvasInner: React.FC<{ theme?: string, setTheme?: (theme: string) => void }> = ({ theme, setTheme }) => {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [liveSDL, setLiveSDL] = useState<string>('Loading SDL…');
@@ -195,6 +196,7 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(true);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [creationBox, setCreationBox] = useState<{ x: number, y: number } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [gridValue, setGridValue] = useState(() => {
     const saved = localStorage.getItem('archflow_grid_value');
@@ -350,14 +352,14 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
     // ─── Annotations → Nodes ─────────────────────────────────────────────────────
     annotationsMap.forEach((ann: any, id: string) => {
       const annType = ann?.get?.('type') ?? 'sticky';
-      const saved  = canvasPositionsMap.get(id) as { x: number; y: number } | undefined;
+      const saved = canvasPositionsMap.get(id) as { x: number; y: number } | undefined;
       newNodes.push({
         id,
         type: annType,
         data: {
-          text:     ann?.get?.('text') ?? '',
-          label:    ann?.get?.('label') ?? 'Domain',
-          color:    ann?.get?.('color'),
+          text: ann?.get?.('text') ?? '',
+          label: ann?.get?.('label') ?? 'Domain',
+          color: ann?.get?.('color'),
           colorIdx: ann?.get?.('colorIdx') ?? 0,
         },
         position: saved ?? { x: 80, y: 80 },
@@ -485,6 +487,37 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
     });
   }, [rfInstance]);
 
+  const handleAddNodeAtContext = useCallback((type: string, name: string, subtype?: string) => {
+    if (!creationBox) return;
+    const position = rfInstance.screenToFlowPosition({ x: creationBox.x, y: creationBox.y });
+
+    const uid = `${type === 'sticky' || type === 'group' ? 'ann' : type === 'database' ? 'db' : 'svc'}_${Math.random().toString(36).substring(2, 7)}`;
+
+    yDoc.transact(() => {
+      if (type === 'sticky' || type === 'group') {
+        const ann = new Y.Map();
+        ann.set('type', type);
+        ann.set('text', type === 'sticky' ? name : '');
+        ann.set('label', type === 'group' ? name : '');
+        ann.set('color', type === 'sticky' ? '#fef08a' : undefined);
+        annotationsMap.set(uid, ann);
+      } else if (type === 'database') {
+        const ds = new Y.Map();
+        ds.set('displayName', name);
+        ds.set('type', subtype ?? 'postgresql');
+        datastoresMap.set(uid, ds);
+      } else {
+        const svc = new Y.Map();
+        svc.set('displayName', name);
+        svc.set('type', type);
+        svc.set('owned', type !== 'external');
+        if (subtype) svc.set('subtype', subtype);
+        servicesMap.set(uid, svc);
+      }
+      canvasPositionsMap.set(uid, { x: Math.round(position.x), y: Math.round(position.y) });
+    });
+  }, [creationBox, rfInstance]);
+
   // ─── Context Menu Handlers ─────────────────────────────────────────────────
   const onNodeContextMenu = useCallback((e: React.MouseEvent, node: Node) => {
     e.preventDefault();
@@ -499,7 +532,7 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
 
   const onPaneContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, type: 'pane' });
+    setCreationBox({ x: e.clientX, y: e.clientY });
   }, []);
 
   const handleContextDelete = useCallback((id: string, type: 'node' | 'edge') => {
@@ -514,7 +547,7 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
         }
       } else {
         const isAnnotation = annotationsMap.has(id);
-        const isDatastore  = datastoresMap.has(id);
+        const isDatastore = datastoresMap.has(id);
         if (isAnnotation) annotationsMap.delete(id);
         else if (isDatastore) datastoresMap.delete(id);
         else {
@@ -522,7 +555,7 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
           // Cascade delete contracts
           contractsMap.forEach((c: any, cid: string) => {
             const from = c.get?.('from');
-            const to   = c.get?.('to');
+            const to = c.get?.('to');
             const svcId = id.replace('svc_', '');
             if (from === svcId || to === svcId || from === id || to === id) contractsMap.delete(cid);
           });
@@ -534,7 +567,7 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
 
   const handleDuplicate = useCallback((nodeId: string) => {
     const newId = `${nodeId.split('_')[0]}_${Math.random().toString(36).substring(2, 7)}`;
-    const pos   = canvasPositionsMap.get(nodeId) as { x: number; y: number } | undefined;
+    const pos = canvasPositionsMap.get(nodeId) as { x: number; y: number } | undefined;
     const offset = { x: (pos?.x ?? 100) + 40, y: (pos?.y ?? 100) + 40 };
 
     yDoc.transact(() => {
@@ -669,7 +702,7 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
    */
   const onNodesChange: OnNodesChange = useCallback((changes) => {
     setNodes((nds) => applyNodeChanges(changes, nds));
-    
+
     // Only persist to Yjs when the drag is COMPLETE (not every intermediate pixel)
     // This prevents the canvasPositionsMap observer from re-triggering syncFromYjs
     // mid-drag, which would overwrite the node's live position and make nodes disappear.
@@ -697,20 +730,20 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
 
   const onConnect = useCallback((connection: Connection) => {
     if (!connection.source || !connection.target) return;
-    
+
     yDoc.transact(() => {
       // Create new contract ID
       const contractId = `c_${Math.random().toString(36).substring(2, 10)}`;
-      
+
       const contractMap = new Y.Map();
       contractMap.set('from', connection.source);
       contractMap.set('to', connection.target);
       contractMap.set('protocol', 'TCP'); // default
       contractMap.set('pattern', 'sync-request-response');
-      
+
       if (connection.sourceHandle) contractMap.set('sourceHandle', connection.sourceHandle);
       if (connection.targetHandle) contractMap.set('targetHandle', connection.targetHandle);
-      
+
       contractsMap.set(contractId, contractMap);
     });
   }, []);
@@ -718,7 +751,7 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
   const onEdgeUpdate = useCallback((oldEdge: Edge, newConnection: Connection) => {
     const contractId = oldEdge.id.replace('edge_', '');
     const contractMap = contractsMap.get(contractId);
-    
+
     if (contractMap instanceof Y.Map) {
       yDoc.transact(() => {
         if (newConnection.source) contractMap.set('from', newConnection.source);
@@ -886,6 +919,12 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
 
   return (
     <div className="relative w-screen h-screen bg-bg-primary overflow-hidden">
+      {/* Premium Spotlight Overlay (Dark Mode Only) */}
+      {theme === 'dark' && (
+        <div className="absolute inset-0 z-0 pointer-events-none opacity-40" 
+             style={{ background: 'radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.1) 0%, transparent 70%)' }}>
+        </div>
+      )}
 
       {/* ─── Floating Excalidraw-Style Toolbar ─────────────────────────── */}
       <div className="absolute left-6 top-1/2 -translate-y-1/2 z-[150] flex flex-col gap-2 
@@ -900,7 +939,7 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
           { divider: true },
           { type: 'sticky', label: 'Sticky Note', icon: '📝', color: 'text-yellow-200' },
           { type: 'group', label: 'Domain/Region', icon: '⬚', color: 'text-white/40' },
-        ].map((item, idx) => 
+        ].map((item, idx) =>
           item.divider ? (
             <div key={`div-${idx}`} className="w-full h-px bg-white/10 my-1 py-0" />
           ) : (
@@ -909,12 +948,12 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
               onClick={(e) => {
                 e.stopPropagation();
                 handleAddItem({
-                   type: item.type!,
-                   subtype: item.subtype,
-                   label: item.label!.split('/')[0],
-                   icon: item.icon!,
-                   description: '',
-                   color: item.color!
+                  type: item.type!,
+                  subtype: item.subtype,
+                  label: item.label!.split('/')[0],
+                  icon: item.icon!,
+                  description: '',
+                  color: item.color!
                 });
               }}
               title={`Add ${item.label}`}
@@ -930,7 +969,7 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
 
       {/* ─── Component Library Panel ───────────────────────────────────── */}
       <aside
-        className={`absolute z-[100] flex flex-col transition-all duration-300 ease-out overflow-hidden shadow-[2px_0_20px_rgba(0,0,0,0.15)]
+        className={`absolute z-[2000] flex flex-col transition-all duration-300 ease-out overflow-hidden shadow-[2px_0_20px_rgba(0,0,0,0.15)]
           ${isLibraryOpen
             ? 'top-0 left-0 h-full w-[240px] bg-bg-sidebar border-r border-white/5 backdrop-blur-2xl'
             : 'top-4 left-4 h-10 w-10 bg-bg-badge border border-border-subtle backdrop-blur-md rounded-lg cursor-pointer hover:bg-bg-node-solid'
@@ -995,7 +1034,11 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
             // Allow selection for all edges (including owner lines) so they can be deleted
             setSelected(originalId, 'contract');
           }}
-          onPaneClick={() => { clearSelection(); setContextMenu(null); }}
+          onPaneClick={() => {
+            clearSelection();
+            if (creationBox) setCreationBox(null);
+            if (contextMenu) setContextMenu(null);
+          }}
           fitView
           fitViewOptions={{ padding: 0.15 }}
           snapToGrid
@@ -1004,16 +1047,16 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
           selectionKeyCode="Shift"
           deleteKeyCode={['Backspace', 'Delete']}
         >
-          <Background 
-            variant={BackgroundVariant.Lines} 
-            gap={30} 
-            size={1} 
-            color={theme === 'light' ? `rgba(0,0,0,${mappedOpacity})` : `rgba(255,255,255,${mappedOpacity})`} 
+          <Background
+            variant={BackgroundVariant.Lines}
+            gap={30}
+            size={1}
+            color={theme === 'light' ? `rgba(0,0,0,${mappedOpacity})` : `rgba(50,150,255,${mappedOpacity * 0.7})`}
           />
-          <Controls 
-            position="bottom-center" 
+          <Controls
+            position="bottom-center"
             className="!flex !flex-row !bg-bg-node !border-border !shadow-2xl !mb-4 !p-0.5 !gap-0.5 !rounded-xl
-                       [&>button]:!border-none [&>button]:!bg-transparent hover:[&>button]:!bg-white/10 [&>button]:!transition-colors [&>button]:!rounded-lg" 
+                       [&>button]:!border-none [&>button]:!bg-transparent hover:[&>button]:!bg-white/10 [&>button]:!transition-colors [&>button]:!rounded-lg"
           />
           <MiniMap
             className="!bg-bg-node !border-border !shadow-lg hidden md:block"
@@ -1036,12 +1079,21 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
             onDelete={handleContextDelete}
             onDuplicate={handleDuplicate}
             onRename={(id) => {
-               // We set renaming state (which will trigger standard node inline rename logic)
-               setRenamingId(id);
+              // We set renaming state (which will trigger standard node inline rename logic)
+              setRenamingId(id);
             }}
             onChangeType={handleChangeType}
             onCopyId={handleCopyId}
             onExport={handleExport}
+          />
+        )}
+
+        {creationBox && (
+          <CanvasCreationPopover
+            x={creationBox.x}
+            y={creationBox.y}
+            onClose={() => setCreationBox(null)}
+            onSubmit={handleAddNodeAtContext}
           />
         )}
 
@@ -1068,7 +1120,7 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
         </div>
 
         {/* Creation Palette */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex gap-1 p-1 bg-bg-badge/80 backdrop-blur-md border border-border-subtle rounded-xl shadow-2xl">
+        {/* <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex gap-1 p-1 bg-bg-badge/80 backdrop-blur-md border border-border-subtle rounded-xl shadow-2xl">
           {[
             { id: 'service', label: 'Service', icon: '🚀', color: 'text-service' },
             { id: 'gateway', label: 'Gateway', icon: '🔀', color: 'text-gateway' },
@@ -1086,16 +1138,15 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
               </span>
             </button>
           ))}
-        </div>
+        </div> */}
       </main>
 
       {/* Settings / Excalidraw-like Left Sidebar */}
-      <aside 
-        className={`absolute z-[100] flex flex-col transition-all duration-300 ease-out overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.15)] ${
-          isSettingsOpen 
-            ? 'top-0 left-0 h-full w-[280px] bg-bg-sidebar border-r border-white/5 backdrop-blur-2xl rounded-none' 
-            : 'bottom-6 left-6 w-10 h-10 bg-bg-badge border border-border-subtle backdrop-blur-md rounded-lg cursor-pointer hover:bg-bg-node-solid items-center justify-center'
-        }`}
+      <aside
+        className={`absolute z-[1000] flex flex-col transition-all duration-300 ease-out overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.15)] ${isSettingsOpen
+          ? 'top-0 left-0 h-full w-[280px] bg-bg-sidebar border-r border-white/5 backdrop-blur-2xl rounded-none'
+          : 'bottom-6 left-6 w-10 h-10 bg-bg-badge border border-border-subtle backdrop-blur-md rounded-lg cursor-pointer hover:bg-bg-node-solid items-center justify-center'
+          }`}
         onClick={!isSettingsOpen ? () => setIsSettingsOpen(true) : undefined}
       >
         {isSettingsOpen ? (
@@ -1105,38 +1156,68 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
                 <Settings className="w-5 h-5 text-service" />
                 <h2 className="m-0 text-sm uppercase tracking-widest text-text-primary font-bold">Settings</h2>
               </div>
-              <button 
+              <button
                 onClick={(e) => { e.stopPropagation(); setIsSettingsOpen(false); }}
                 className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-white/10 text-text-secondary transition-colors"
               >
                 ✕
               </button>
             </div>
-            
+
             <div className="flex flex-col gap-3 mt-4">
-              <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider">Appearance</span>
-              <button 
-                onClick={(e) => { e.stopPropagation(); toggleTheme?.(); }}
-                className="flex items-center justify-between w-full p-3 rounded-lg bg-bg-node border border-white/5 hover:border-service/50 transition-colors text-sm"
-              >
-                <div className="flex items-center gap-2">
-                  {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
-                  <span>Theme</span>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider">Themes</span>
+                  <span className="text-[9px] text-text-secondary/50 uppercase font-medium">Scroll for more</span>
                 </div>
-                <span className="text-text-secondary capitalize">{theme}</span>
-              </button>
+                <div className="grid grid-cols-2 gap-2 mt-1 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
+                  {[
+                    { id: 'dark', name: 'Deep Void', icon: <Moon size={12} /> },
+                    { id: 'light', name: 'Light', icon: <Sun size={12} /> },
+                    { id: 'dracula', name: 'Dracula', icon: <div className="w-3 h-3 rounded-full bg-[#ff79c6]"></div> },
+                    { id: 'nord', name: 'Nord', icon: <div className="w-3 h-3 rounded-full bg-[#88c0d0]"></div> },
+                    { id: 'catppuccin', name: 'Mocha', icon: <div className="w-3 h-3 rounded-full bg-[#cba6f7]"></div> },
+                    { id: 'tokyo-night', name: 'Tokyo', icon: <div className="w-3 h-3 rounded-full bg-[#7aa2f7]"></div> },
+                    { id: 'one-dark', name: 'One Dark', icon: <div className="w-3 h-3 rounded-full bg-[#61afef]"></div> },
+                    { id: 'cyberpunk', name: 'Cyberpunk', icon: <div className="w-3 h-3 rounded-full bg-[#ff00ff]"></div> },
+                    { id: 'matrix', name: 'Hacker', icon: <div className="w-3 h-3 rounded-full bg-[#00ff41]"></div> },
+                    { id: 'win95', name: 'Retro 95', icon: <div className="w-3 h-3 border border-black/20 bg-[#c0c0c0]"></div> },
+                    { id: 'valorant', name: 'Valorant', icon: <div className="w-3 h-3 rounded-full bg-[#ff4655]"></div> },
+                    { id: 'vaporwave', name: 'Vaporwave', icon: <div className="w-3 h-3 rounded-full bg-[#ff71ce]"></div> },
+                    { id: 'synthwave', name: 'Synthwave', icon: <div className="w-3 h-3 rounded-full bg-[#f97e72]"></div> },
+                    { id: 'neon-sunset', name: 'Sunset', icon: <div className="w-3 h-3 rounded-full bg-[#ff5e00]"></div> },
+                    { id: 'midnight-green', name: 'Green Glow', icon: <div className="w-3 h-3 rounded-full bg-[#00ff66]"></div> },
+                    { id: 'magenta-glow', name: 'Magenta', icon: <div className="w-3 h-3 rounded-full bg-[#ff00ff]"></div> },
+                    { id: 'monochrome', name: 'Noir', icon: <div className="w-3 h-3 rounded-full bg-white"></div> },
+                    { id: 'solarized-dark', name: 'Solarized', icon: <div className="w-3 h-3 rounded-full bg-[#268bd2]"></div> },
+                  ].map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={(e) => { e.stopPropagation(); setTheme?.(t.id); }}
+                      className={`flex items-center gap-2 p-2 rounded-lg border text-xs transition-colors ${
+                        theme === t.id 
+                          ? 'bg-service/10 border-service text-service font-bold' 
+                          : 'bg-bg-node border-white/5 text-text-secondary hover:border-white/20'
+                      }`}
+                    >
+                      {t.icon}
+                      <span className="truncate">{t.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div className="flex flex-col gap-2 p-3 rounded-lg bg-bg-node border border-white/5 mt-2">
                 <div className="flex justify-between items-center text-[11px]">
                   <span className="text-text-secondary font-bold uppercase tracking-wider">Grid Transparency</span>
                   <span className="text-service font-mono font-bold tracking-widest">{gridValue.toFixed(2)}</span>
                 </div>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="1" 
-                  step="0.001" 
-                  value={gridValue} 
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.001"
+                  value={gridValue}
                   onChange={(e) => handleGridValueChange(parseFloat(e.target.value))}
                   onClick={(e) => e.stopPropagation()}
                   className="w-full accent-service cursor-pointer mt-1"
@@ -1150,12 +1231,12 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
                     {edgeFlexibility === 0 ? 'Rigid' : edgeFlexibility === 1 ? 'Step' : edgeFlexibility === 2 ? 'Smooth' : 'Fluid'}
                   </span>
                 </div>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="3" 
-                  step="1" 
-                  value={edgeFlexibility} 
+                <input
+                  type="range"
+                  min="0"
+                  max="3"
+                  step="1"
+                  value={edgeFlexibility}
                   onChange={(e) => {
                     const val = parseInt(e.target.value, 10);
                     setEdgeFlexibility(val);
@@ -1165,7 +1246,7 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
                   className="w-full accent-service cursor-pointer mt-1"
                 />
               </div>
-              
+
               <div className="mt-6 pt-4 border-t border-white/5 flex flex-col gap-2">
                 <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider">Canvas</span>
                 <button
@@ -1186,63 +1267,62 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
       </aside>
 
       {/* Right Sidebar Toggleable (SDL Viewer or Inspector) */}
-      <aside 
-        className={`absolute z-[100] flex flex-col transition-all duration-300 ease-out overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.15)] ${
-          isRightSidebarOpen 
-            ? 'top-0 right-0 h-full w-[450px] bg-bg-sidebar border-l border-white/5 backdrop-blur-2xl rounded-none' 
-            : 'top-4 right-4 w-10 h-10 bg-bg-badge border border-border-subtle backdrop-blur-md rounded-lg cursor-pointer hover:bg-bg-node-solid items-center justify-center'
-        }`}
+      <aside
+        className={`absolute z-[100] flex flex-col transition-all duration-300 ease-out overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.15)] ${isRightSidebarOpen
+          ? 'top-0 right-0 h-full w-[450px] bg-bg-sidebar border-l border-white/5 backdrop-blur-2xl rounded-none'
+          : 'top-4 right-4 w-10 h-10 bg-bg-badge border border-border-subtle backdrop-blur-md rounded-lg cursor-pointer hover:bg-bg-node-solid items-center justify-center'
+          }`}
         onClick={!isRightSidebarOpen ? () => setIsSdlOpen(true) : undefined}
       >
         {isRightSidebarOpen ? (
           selectedId ? (
             <Inspector />
           ) : (
-          <div className="p-5 flex flex-col gap-4 h-full min-w-[320px]">
-            <div className="flex justify-between items-center">
-              <h2 className="m-0 text-sm uppercase tracking-widest text-service font-bold">Live SDL</h2>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: wsColor }} />
-                  <span className="text-[10px] uppercase font-bold" style={{ color: wsColor }}>{wsStatus}</span>
-                </div>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); setIsSdlOpen(false); }}
-                  className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-white/10 text-text-secondary transition-colors"
-                  title="Close sidebar"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {sdlStats && (
-              <div className="flex gap-2 flex-wrap">
-                {[
-                  { label: 'Services', val: sdlStats.services, color: 'var(--color-service)' },
-                  { label: 'Contracts', val: sdlStats.contracts, color: '#10b981' },
-                  { label: 'Datastores', val: sdlStats.datastores, color: 'var(--color-database)' },
-                ].map(({ label, val, color }) => (
-                  <div key={label} className="flex-1 min-w-[70px] bg-white/5 border border-white/5 
-                                            rounded-lg p-2 text-center"
-                       style={{ borderColor: `${color}33` }}>
-                    <div className="text-lg font-bold" style={{ color }}>{val}</div>
-                    <div className="text-[9px] text-text-secondary uppercase tracking-[0.08em]">{label}</div>
+            <div className="p-5 flex flex-col gap-4 h-full min-w-[320px]">
+              <div className="flex justify-between items-center">
+                <h2 className="m-0 text-sm uppercase tracking-widest text-service font-bold">Live SDL</h2>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: wsColor }} />
+                    <span className="text-[10px] uppercase font-bold" style={{ color: wsColor }}>{wsStatus}</span>
                   </div>
-                ))}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setIsSdlOpen(false); }}
+                    className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-white/10 text-text-secondary transition-colors"
+                    title="Close sidebar"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
-            )}
 
-            <pre className="bg-bg-pre text-text-primary p-4 rounded-lg font-mono text-[11px] 
+              {sdlStats && (
+                <div className="flex gap-2 flex-wrap">
+                  {[
+                    { label: 'Services', val: sdlStats.services, color: 'var(--color-service)' },
+                    { label: 'Contracts', val: sdlStats.contracts, color: '#10b981' },
+                    { label: 'Datastores', val: sdlStats.datastores, color: 'var(--color-database)' },
+                  ].map(({ label, val, color }) => (
+                    <div key={label} className="flex-1 min-w-[70px] bg-white/5 border border-white/5 
+                                            rounded-lg p-2 text-center"
+                      style={{ borderColor: `${color}33` }}>
+                      <div className="text-lg font-bold" style={{ color }}>{val}</div>
+                      <div className="text-[9px] text-text-secondary uppercase tracking-[0.08em]">{label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <pre className="bg-bg-pre text-text-primary p-4 rounded-lg font-mono text-[11px] 
                            overflow-auto flex-1 border border-border-subtle transition-all duration-300">
-              {liveSDL}
-            </pre>
-          </div>
+                {liveSDL}
+              </pre>
+            </div>
           )
         ) : (
           <div className="flex items-center justify-center relative text-text-secondary w-full h-full">
             <div className="absolute -top-1 -right-1">
-               <div className="w-2.5 h-2.5 rounded-full shadow-[0_0_8px_currentColor] border-[1.5px] border-bg-badge" style={{ color: wsColor, background: wsColor }} />
+              <div className="w-2.5 h-2.5 rounded-full shadow-[0_0_8px_currentColor] border-[1.5px] border-bg-badge" style={{ color: wsColor, background: wsColor }} />
             </div>
             <FileJson size={18} className="opacity-80" />
           </div>
@@ -1252,7 +1332,7 @@ const BaseCanvasInner: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => 
   );
 };
 
-const BaseCanvas: React.FC<{ theme?: 'dark' | 'light', toggleTheme?: () => void }> = (props) => (
+const BaseCanvas: React.FC<{ theme?: string, setTheme?: (theme: string) => void }> = (props) => (
   <ReactFlowProvider>
     <BaseCanvasInner {...props} />
   </ReactFlowProvider>

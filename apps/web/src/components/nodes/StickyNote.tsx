@@ -25,7 +25,7 @@ const StickyNote = ({ data, selected, id }: NodeProps) => {
   return (
     <div
       style={{ background: color, minWidth: 180, minHeight: 100 }}
-      className={`relative rounded-lg shadow-xl border-2 p-3 flex flex-col gap-1 transition-all duration-200 ${
+      className={`relative rounded-lg shadow-xl border-2 p-3 flex flex-col gap-1 ${
         selected ? 'border-yellow-400 shadow-yellow-400/20' : 'border-transparent'
       }`}
       onDoubleClick={() => setEditing(true)}
