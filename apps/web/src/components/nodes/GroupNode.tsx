@@ -35,12 +35,14 @@ const GroupNode = ({ data, selected, id }: NodeProps) => {
       style={{
         background: GROUP_COLORS[colorIdx % GROUP_COLORS.length],
         border: `2px dashed ${GROUP_BORDERS[colorIdx % GROUP_BORDERS.length]}`,
-        minWidth: 240,
-        minHeight: 160,
+        width: '100%',
+        height: '100%',
+        minWidth: 100,
+        minHeight: 80,
         borderRadius: 12,
         position: 'relative',
       }}
-      className=""
+      className="group-node-inner"
     >
       <NodeResizer
         minWidth={200}

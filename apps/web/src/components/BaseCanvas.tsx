@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
-import { FileJson, Menu, Moon, Sun, Settings, Library, Undo2, Redo2 } from 'lucide-react';
 import ReactFlow, {
   Background,
   Controls,
@@ -16,7 +15,12 @@ import ReactFlow, {
   ReactFlowProvider,
   ReactFlowInstance,
   MarkerType,
+  getRectOfNodes,
+  getTransformForBounds,
+  SelectionMode,
 } from 'reactflow';
+import { toPng } from 'html-to-image';
+import { FileJson, Menu, Moon, Sun, Settings, Library, Undo2, Redo2, Download, ChevronDown, Share2, ImageIcon } from 'lucide-react';
 import 'reactflow/dist/style.css';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
@@ -198,6 +202,7 @@ const BaseCanvasInner: React.FC<{ theme?: string, setTheme?: (theme: string) => 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [creationBox, setCreationBox] = useState<{ x: number, y: number } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [gridValue, setGridValue] = useState(() => {
     const saved = localStorage.getItem('archflow_grid_value');
     return saved ? parseFloat(saved) : 0.25;
@@ -208,7 +213,114 @@ const BaseCanvasInner: React.FC<{ theme?: string, setTheme?: (theme: string) => 
   });
   const { selectedId, setSelected, clearSelection } = useSelectionStore();
   const rfInstance = useReactFlow();
+  const { fitView, getNodes, screenToFlowPosition } = rfInstance;
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDuplicate = useCallback((nodeId: string) => {
+    const newId = `${nodeId.split('_')[0]}_${Math.random().toString(36).substring(2, 7)}`;
+    const pos = canvasPositionsMap.get(nodeId) as { x: number; y: number } | undefined;
+    const offset = { x: (pos?.x ?? 100) + 40, y: (pos?.y ?? 100) + 40 };
+
+    yDoc.transact(() => {
+      if (annotationsMap.has(nodeId)) {
+        const src = annotationsMap.get(nodeId) as Y.Map<any>;
+        const copy = new Y.Map();
+        src.forEach((v: any, k: string) => copy.set(k, v));
+        annotationsMap.set(newId, copy);
+      } else if (datastoresMap.has(nodeId)) {
+        const src = datastoresMap.get(nodeId) as Y.Map<any>;
+        const copy = new Y.Map();
+        src.forEach((v: any, k: string) => copy.set(k, v));
+        datastoresMap.set(newId, copy);
+      } else if (servicesMap.has(nodeId)) {
+        const src = servicesMap.get(nodeId) as Y.Map<any>;
+        const copy = new Y.Map();
+        src.forEach((v: any, k: string) => copy.set(k, v));
+        servicesMap.set(newId, copy);
+      }
+      canvasPositionsMap.set(newId, offset);
+    });
+  }, []);
+
+  const handleGroupNodes = useCallback(() => {
+    const allNodes = getNodes();
+    const selectedNodes = allNodes.filter((n) => n.selected);
+    
+    if (selectedNodes.length < 2) return;
+
+    const bounds = getRectOfNodes(selectedNodes);
+    const padding = 60;
+    
+    const uid = `ann_group_${Math.random().toString(36).substring(2, 7)}`;
+    
+    yDoc.transact(() => {
+      const ann = new Y.Map();
+      ann.set('type', 'group');
+      ann.set('label', 'New Group');
+      ann.set('width', bounds.width + padding * 2);
+      ann.set('height', bounds.height + padding * 2);
+      ann.set('colorIdx', Math.floor(Math.random() * 5));
+      annotationsMap.set(uid, ann);
+      
+      canvasPositionsMap.set(uid, {
+        x: bounds.x - padding,
+        y: bounds.y - padding,
+      });
+    });
+  }, [getNodes]);
+
+  const handleExport = useCallback((nodeId: string) => {
+    const src = servicesMap.get(nodeId) as Y.Map<any> | undefined;
+    const data = src ? src.toJSON() : datastoresMap.get(nodeId);
+    if (data) {
+      const blob = new Blob([JSON.stringify({ [nodeId]: data }, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${nodeId}.json`;
+      a.click();
+    }
+  }, []);
+
+  const handleExportSDL = useCallback(() => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(liveSDL);
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "architecture.sdl.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  }, [liveSDL]);
+
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        
+        yDoc.transact(() => {
+          servicesMap.clear();
+          contractsMap.clear();
+          datastoresMap.clear();
+          annotationsMap.clear();
+          canvasPositionsMap.clear();
+          parser.fromSDL(json, yDoc);
+        });
+        
+        setTimeout(() => {
+          fitView({ padding: 0.2, duration: 800 });
+        }, 100);
+
+      } catch (err) {
+        console.error("Failed to parse SDL JSON:", err);
+        alert("Failed to load SDL file. Invalid JSON.");
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [fitView]);
 
   const isRightSidebarOpen = isSdlOpen || selectedId !== null;
 
@@ -363,6 +475,8 @@ const BaseCanvasInner: React.FC<{ theme?: string, setTheme?: (theme: string) => 
           colorIdx: ann?.get?.('colorIdx') ?? 0,
         },
         position: saved ?? { x: 80, y: 80 },
+        width: ann?.get?.('width'),
+        height: ann?.get?.('height'),
         style: annType === 'group' ? { zIndex: -1 } : {},
       });
     });
@@ -380,38 +494,7 @@ const BaseCanvasInner: React.FC<{ theme?: string, setTheme?: (theme: string) => 
     setLiveSDL(JSON.stringify(sdl, null, 2));
   }, []);
 
-  // ─── Keyboard Shortcuts ────────────────────────────────────────────────────
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      // Don't intercept when user is typing in an input/textarea
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
 
-      const isMac = navigator.platform.toUpperCase().includes('MAC');
-      const metaKey = isMac ? e.metaKey : e.ctrlKey;
-
-      // Undo / Redo
-      if (metaKey && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        undoManager.undo();
-        return;
-      }
-      if (metaKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-        e.preventDefault();
-        undoManager.redo();
-        return;
-      }
-
-      // Duplicate selected — Cmd+D
-      if (metaKey && e.key === 'd') {
-        e.preventDefault();
-        if (selectedId) handleDuplicate(selectedId);
-        return;
-      }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [selectedId]);
 
   // ─── Drag-and-Drop from Palette ────────────────────────────────────────────
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -428,7 +511,7 @@ const BaseCanvasInner: React.FC<{ theme?: string, setTheme?: (theme: string) => 
 
     const bounds = reactFlowWrapper.current?.getBoundingClientRect();
     if (!bounds) return;
-    const position = rfInstance.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
 
     const uid = `${item.type === 'sticky' || item.type === 'group' ? 'ann' : item.type === 'database' ? 'db' : 'svc'}_${Math.random().toString(36).substring(2, 7)}`;
 
@@ -455,10 +538,10 @@ const BaseCanvasInner: React.FC<{ theme?: string, setTheme?: (theme: string) => 
       }
       canvasPositionsMap.set(uid, { x: Math.round(position.x), y: Math.round(position.y) });
     });
-  }, [rfInstance]);
+  }, [screenToFlowPosition]);
 
   const handleAddItem = useCallback((item: PaletteItemType) => {
-    const position = rfInstance.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+    const position = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
 
     const uid = `${item.type === 'sticky' || item.type === 'group' ? 'ann' : item.type === 'database' ? 'db' : 'svc'}_${Math.random().toString(36).substring(2, 7)}`;
 
@@ -485,11 +568,11 @@ const BaseCanvasInner: React.FC<{ theme?: string, setTheme?: (theme: string) => 
       }
       canvasPositionsMap.set(uid, { x: Math.round(position.x), y: Math.round(position.y) });
     });
-  }, [rfInstance]);
+  }, [screenToFlowPosition]);
 
   const handleAddNodeAtContext = useCallback((type: string, name: string, subtype?: string) => {
     if (!creationBox) return;
-    const position = rfInstance.screenToFlowPosition({ x: creationBox.x, y: creationBox.y });
+    const position = screenToFlowPosition({ x: creationBox.x, y: creationBox.y });
 
     const uid = `${type === 'sticky' || type === 'group' ? 'ann' : type === 'database' ? 'db' : 'svc'}_${Math.random().toString(36).substring(2, 7)}`;
 
@@ -516,7 +599,7 @@ const BaseCanvasInner: React.FC<{ theme?: string, setTheme?: (theme: string) => 
       }
       canvasPositionsMap.set(uid, { x: Math.round(position.x), y: Math.round(position.y) });
     });
-  }, [creationBox, rfInstance]);
+  }, [creationBox, screenToFlowPosition]);
 
   // ─── Context Menu Handlers ─────────────────────────────────────────────────
   const onNodeContextMenu = useCallback((e: React.MouseEvent, node: Node) => {
@@ -565,43 +648,95 @@ const BaseCanvasInner: React.FC<{ theme?: string, setTheme?: (theme: string) => 
     });
   }, []);
 
-  const handleDuplicate = useCallback((nodeId: string) => {
-    const newId = `${nodeId.split('_')[0]}_${Math.random().toString(36).substring(2, 7)}`;
-    const pos = canvasPositionsMap.get(nodeId) as { x: number; y: number } | undefined;
-    const offset = { x: (pos?.x ?? 100) + 40, y: (pos?.y ?? 100) + 40 };
 
-    yDoc.transact(() => {
-      if (annotationsMap.has(nodeId)) {
-        const src = annotationsMap.get(nodeId) as Y.Map<any>;
-        const copy = new Y.Map();
-        src.forEach((v: any, k: string) => copy.set(k, v));
-        annotationsMap.set(newId, copy);
-      } else if (datastoresMap.has(nodeId)) {
-        const src = datastoresMap.get(nodeId) as Y.Map<any>;
-        const copy = new Y.Map();
-        src.forEach((v: any, k: string) => copy.set(k, v));
-        datastoresMap.set(newId, copy);
-      } else if (servicesMap.has(nodeId)) {
-        const src = servicesMap.get(nodeId) as Y.Map<any>;
-        const copy = new Y.Map();
-        src.forEach((v: any, k: string) => copy.set(k, v));
-        servicesMap.set(newId, copy);
+
+  // ─── Keyboard Shortcuts ────────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      // Don't intercept when user is typing in an input/textarea
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
+      const isMac = navigator.platform.toUpperCase().includes('MAC');
+      const metaKey = isMac ? e.metaKey : e.ctrlKey;
+
+      // Undo / Redo
+      if (metaKey && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undoManager.undo();
+        return;
       }
-      canvasPositionsMap.set(newId, offset);
-    });
-  }, []);
+      if (metaKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        undoManager.redo();
+        return;
+      }
 
-  const handleExport = useCallback((nodeId: string) => {
-    const src = servicesMap.get(nodeId) as Y.Map<any> | undefined;
-    const data = src ? src.toJSON() : datastoresMap.get(nodeId);
-    if (data) {
-      const blob = new Blob([JSON.stringify({ [nodeId]: data }, null, 2)], { type: 'application/json' });
+      // Duplicate selected — Cmd+D
+      if (metaKey && e.key === 'd') {
+        e.preventDefault();
+        if (selectedId) handleDuplicate(selectedId);
+        return;
+      }
+
+      // Grouping — Cmd+G or Shift+G
+      if ((metaKey && e.key === 'g') || (e.shiftKey && e.key === 'G')) {
+        e.preventDefault();
+        handleGroupNodes();
+        return;
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [selectedId, handleGroupNodes]);
+
+  const handleDownloadPNG = useCallback(() => {
+    const nodes = getNodes();
+    if (nodes.length === 0) return;
+
+    const nodesBounds = getRectOfNodes(nodes);
+    const imageWidth = nodesBounds.width + 100;
+    const imageHeight = nodesBounds.height + 100;
+
+    const transform = getTransformForBounds(
+      nodesBounds,
+      imageWidth,
+      imageHeight,
+      0.5,
+      2,
+      0.1
+    );
+
+    const viewport = document.querySelector('.react-flow__viewport') as HTMLElement;
+    if (!viewport) return;
+
+    toPng(viewport, {
+      backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim() || '#030711',
+      width: imageWidth,
+      height: imageHeight,
+      style: {
+        width: `${imageWidth}px`,
+        height: `${imageHeight}px`,
+        transform: `translate(${transform[0]}px, ${transform[1]}px) scale(${transform[2]})`,
+      },
+      filter: (node) => {
+        // Exclude controls and other UI elements if necessary
+        if (
+          node.classList?.contains('react-flow__controls') ||
+          node.classList?.contains('react-flow__minimap')
+        ) {
+          return false;
+        }
+        return true;
+      }
+    }).then((dataUrl) => {
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `${nodeId}.json`;
+      a.setAttribute('download', `archflow-export-${new Date().getTime()}.png`);
+      a.setAttribute('href', dataUrl);
       a.click();
-    }
-  }, []);
+      setIsExportMenuOpen(false);
+    });
+  }, [getNodes]);
 
   const handleCopyId = useCallback((id: string) => {
     navigator.clipboard?.writeText(id);
@@ -717,6 +852,22 @@ const BaseCanvasInner: React.FC<{ theme?: string, setTheme?: (theme: string) => 
               x: Math.round(change.position.x),
               y: Math.round(change.position.y),
             });
+          }
+        });
+      });
+    }
+
+    // Persist dimension changes (for Groups)
+    const dimChanges = changes.filter((c) => c.type === 'dimensions' && c.dimensions);
+    if (dimChanges.length > 0) {
+      yDoc.transact(() => {
+        dimChanges.forEach((change) => {
+          if (change.type === 'dimensions' && change.dimensions) {
+            const ann = annotationsMap.get(change.id);
+            if (ann instanceof Y.Map) {
+              ann.set('width', change.dimensions.width);
+              ann.set('height', change.dimensions.height);
+            }
           }
         });
       });
@@ -1038,6 +1189,7 @@ const BaseCanvasInner: React.FC<{ theme?: string, setTheme?: (theme: string) => 
             clearSelection();
             if (creationBox) setCreationBox(null);
             if (contextMenu) setContextMenu(null);
+            setIsExportMenuOpen(false);
           }}
           fitView
           fitViewOptions={{ padding: 0.15 }}
@@ -1096,6 +1248,56 @@ const BaseCanvasInner: React.FC<{ theme?: string, setTheme?: (theme: string) => 
             onSubmit={handleAddNodeAtContext}
           />
         )}
+
+        {/* Top Left Branding & Export */}
+        <div className="absolute top-6 left-6 z-[1001] flex items-center gap-3">
+          <div 
+            className="flex items-center gap-2 px-3 py-2 bg-bg-node-solid/80 backdrop-blur-xl border border-white/5 rounded-xl shadow-2xl cursor-pointer hover:bg-bg-node-solid transition-all group"
+            onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+          >
+            <div className="w-6 h-6 bg-service rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+              <Share2 size={14} className="text-white" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">ArchFlow</span>
+              <span className="text-[8px] font-bold text-text-secondary uppercase">v0.1.0</span>
+            </div>
+            <ChevronDown size={12} className={`text-text-secondary transition-transform duration-300 ${isExportMenuOpen ? 'rotate-180' : ''}`} />
+          </div>
+
+          {isExportMenuOpen && (
+            <div className="absolute top-full left-0 mt-2 w-48 bg-bg-sidebar border border-white/5 rounded-xl shadow-2xl backdrop-blur-2xl p-1.5 animate-in fade-in zoom-in-95 duration-200">
+              <div className="px-2 py-1.5 text-[9px] font-black uppercase tracking-widest text-text-secondary mb-1">
+                Export Canvas
+              </div>
+              <button
+                onClick={handleDownloadPNG}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors group"
+              >
+                <div className="w-8 h-8 rounded-lg bg-service/10 flex items-center justify-center group-hover:bg-service/20">
+                  <ImageIcon size={16} className="text-service" />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-xs font-bold text-text-primary">Download PNG</span>
+                  <span className="text-[10px] text-text-secondary">Full Resolution</span>
+                </div>
+              </button>
+              <div className="h-px bg-white/5 my-1.5" />
+              <button
+                disabled
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg opacity-50 cursor-not-allowed group"
+              >
+                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+                  <FileJson size={16} className="text-text-secondary" />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-xs font-bold text-text-secondary">Export PDF</span>
+                  <span className="text-[10px] text-text-secondary/50">Coming Soon</span>
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Legend */}
         <div className="absolute bottom-[80px] left-6 z-20 bg-bg-legend/70 backdrop-blur-xl border border-white/5 
@@ -1317,6 +1519,25 @@ const BaseCanvasInner: React.FC<{ theme?: string, setTheme?: (theme: string) => 
                            overflow-auto flex-1 border border-border-subtle transition-all duration-300">
                 {liveSDL}
               </pre>
+
+              {/* Import / Export Controls */}
+              <div className="flex gap-2 shrink-0">
+                <button 
+                  onClick={handleExportSDL} 
+                  className="flex-1 bg-service/10 text-service hover:bg-service/20 border border-service/30 p-2.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <FileJson size={14} />
+                  Export .sdl.json
+                </button>
+                <button 
+                  onClick={() => fileInputRef.current?.click()} 
+                  className="flex-1 bg-white/5 text-text-secondary hover:bg-white/10 hover:text-white border border-white/10 p-2.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <span>📂</span>
+                  Load File
+                </button>
+                <input type="file" ref={fileInputRef} hidden accept=".json" onChange={handleFileUpload} />
+              </div>
             </div>
           )
         ) : (
